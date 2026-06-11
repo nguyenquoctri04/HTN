@@ -111,7 +111,8 @@ def ai_worker_thread():
             current_fps = int(1 / max(time.time() - fps_time, 0.0001))
             fps_time = time.time()
 
-        time.sleep(max(0, (1.0 / 8.0) - (time.time() - start_time)))
+        # Đã cập nhật lên 16 FPS
+        time.sleep(max(0, (1.0 / 16.0) - (time.time() - start_time)))
 
 # ================= LUỒNG SERIAL GIAO TIẾP ARDUINO =================
 def serial_worker_thread():
@@ -163,6 +164,7 @@ def serial_worker_thread():
 def generate_frames():
     global global_frame, current_status
     while True:
+        start_time = time.time()
         frame = None
         with frame_lock:
             if global_frame is not None: frame = global_frame.copy()
@@ -172,8 +174,13 @@ def generate_frames():
         
         color = (0, 0, 255) if "HỎA HOẠN" in current_status else (0, 255, 0)
         cv2.putText(frame, f"STATUS: {current_status}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        
+        # Đã cập nhật quality thành 80 để stream mượt hơn
+        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
         if ret: yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+        
+        # Đồng bộ luồng Web ở 16 FPS để tránh chiếm CPU vô ích
+        time.sleep(max(0, (1.0 / 16.0) - (time.time() - start_time)))
 
 @app.route('/')
 def index():
